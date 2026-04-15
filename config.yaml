@@ -1,0 +1,214 @@
+# config.yaml - Configuración Dashboard Riesgo Geopolítico Ormuz
+
+# ============================================================================
+# DATOS GENERALES
+# ============================================================================
+app:
+  name: "Dashboard Riesgo Geopolítico - Estrecho de Ormuz"
+  version: "1.0"
+  description: "Monitoreo ejecutivo de riesgo geopolítico y precio del petróleo"
+  timezone: "UTC"
+
+# ============================================================================
+# FUENTES DE DATOS - PETRÓLEO
+# ============================================================================
+oil_prices:
+  # yfinance tickers
+  brent_ticker: "BZ=F"           # Brent Crude front-month (ICE)
+  wti_ticker: "CL=F"              # WTI Crude (NYMEX)
+
+  # Historico a mantener
+  historical_days: 365            # 12 meses
+
+  # Umbrales de alertas
+  alerts:
+    price_jump_percent: 5.0        # Alerta si sube/baja >5% en 1 día
+    volatility_high_days: 30       # Período para volatilidad rolling
+    volatility_threshold: 25       # Volatilidad >25% es "alta"
+
+# ============================================================================
+# FUENTES DE DATOS - POLYMARKET
+# ============================================================================
+polymarket:
+  api_url: "https://api.polymarket.com"
+
+  # Mercados de interés (actualizar con IDs reales)
+  # Estos son ejemplos - en producción necesitarás los IDs correctos de la API
+  markets:
+    - id: "market_1"
+      name: "Will Iran attack Israel by June 30, 2026?"
+      category: "escalation"
+      weight: 0.25
+    - id: "market_2"
+      name: "Will oil supply disruption occur in Middle East by June 30, 2026?"
+      category: "supply"
+      weight: 0.25
+    - id: "market_3"
+      name: "Will Strait of Hormuz shipping return to normal by April 30, 2026?"
+      category: "logistics"
+      weight: 0.25
+    - id: "market_4"
+      name: "Will crude oil price exceed $85 in April 2026?"
+      category: "price"
+      weight: 0.25
+
+  # Umbrales
+  liquidity_minimum: 1000         # Mínimo para considerar mercado líquido
+  probability_alert: 75           # Alerta si probabilidad escalada >75%
+  historical_days: 90
+
+# ============================================================================
+# FUENTES DE DATOS - NOTICIAS
+# ============================================================================
+news:
+  # Configuración NewsAPI
+  newsapi:
+    enabled: true
+    api_url: "https://newsapi.org/v2/everything"
+    api_key: "${NEWSAPI_KEY}"      # Variable de entorno
+    language: "en"
+    sort_by: "publishedAt"
+    page_size: 100
+
+  # Keywords a monitorear
+  keywords:
+    - "Strait of Hormuz"
+    - "oil supply disruption"
+    - "Iran sanctions"
+    - "tanker attack"
+    - "OPEC"
+    - "Middle East escalation"
+    - "shipping disruption"
+    - "crude oil"
+    - "petróleo"
+    - "Ormuz"
+
+  # Fuentes confiables preferidas
+  trusted_sources:
+    - "reuters.com"
+    - "bloomberg.com"
+    - "ft.com"
+    - "bbc.com"
+    - "aljazeera.com"
+    - "cnbc.com"
+    - "oilprice.com"
+    - "energyintel.com"
+
+  # Umbrales de retención
+  retention_days: 30              # Mantener noticias últimos 30 días
+  deduplication: true             # Evitar titulares similares
+
+# ============================================================================
+# SCORING DE RIESGO SINTÉTICO
+# ============================================================================
+risk_scoring:
+  # Componentes y pesos
+  components:
+    oil_price_signal:
+      weight: 0.20                # Precio actual vs promedio histórico
+      description: "Impacto del precio del Brent en el score"
+
+    oil_volatility:
+      weight: 0.15                # Volatilidad reciente
+      description: "Mayor volatilidad = mayor riesgo"
+
+    polymarket_escalation:
+      weight: 0.30                # Probabilidades implícitas de escalada
+      description: "Agregado de mercados de Polymarket sobre riesgo"
+
+    polymarket_supply:
+      weight: 0.20                # Riesgo de disrupción de suministro
+      description: "Probabilidades de disrupciones en oferta"
+
+    news_sentiment:
+      weight: 0.10                # Sentimiento de noticias recientes
+      description: "Tonalidad de noticias últimas 24h"
+
+    geopolitical_event_severity:
+      weight: 0.05                # Severidad de eventos recientes
+      description: "Impacto manual de eventos críticos"
+
+  # Umbrales de niveles
+  levels:
+    low: [0, 30]                  # Verde
+    medium: [30, 50]              # Amarillo
+    high: [50, 75]                # Naranja
+    critical: [75, 100]           # Rojo
+
+  # Alertas
+  alert_threshold: 70             # Score >70 dispara alerta
+  change_alert_threshold: 10      # Cambio diario >10 puntos alerta
+
+# ============================================================================
+# BASE DE DATOS
+# ============================================================================
+database:
+  type: "sqlite"
+  path: "data/dashboard.db"
+  auto_backup: true
+  backup_retention_days: 30
+
+  # Tablas principales
+  tables:
+    - oil_prices
+    - polymarket_signals
+    - news_events
+    - risk_scores
+    - alerts_log
+
+# ============================================================================
+# AUTOMATIZACIÓN
+# ============================================================================
+automation:
+  # GitHub Actions schedules
+  oil_prices_schedule: "0 9 * * *"        # Todos los días 09:00 UTC
+  polymarket_schedule: "0,6,12,18 * * * *" # Cada 6 horas
+  news_schedule: "0 * * * *"              # Cada hora en punto
+  scores_schedule: "15 * * * *"           # Cada hora +15 min
+
+  # Timeouts y reintentos
+  request_timeout_seconds: 30
+  max_retries: 3
+  retry_delay_seconds: 5
+
+# ============================================================================
+# VISUALIZACIÓN & UX
+# ============================================================================
+dashboard:
+  # Tema
+  theme: "light"
+
+  # Gráficos
+  candlestick_chart_height: 500
+  timeseries_chart_height: 400
+
+  # Límites de datos mostrados
+  news_per_page: 20
+  market_table_rows: 10
+
+  # Configuración responsive
+  mobile_breakpoint: 768
+
+  # Colores del semáforo
+  colors:
+    low: "#2ecc71"                # Verde
+    medium: "#f39c12"             # Amarillo
+    high: "#e74c3c"               # Rojo
+    critical: "#8b0000"           # Rojo oscuro
+
+# ============================================================================
+# LOGGING & MONITOREO
+# ============================================================================
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/dashboard.log"
+  retention_days: 30
+
+# ============================================================================
+# VARIABLES DE ENTORNO REQUERIDAS
+# ============================================================================
+# Agregar a .env o GitHub Secrets:
+# NEWSAPI_KEY=tu_clave_aqui
+# POLYMARKET_API_KEY=opcional (si la API lo requiere)
+# DATABASE_URL=opcional (si usas PostgreSQL en lugar de SQLite)
